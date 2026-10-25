@@ -82,14 +82,16 @@ log "Пароль root установлен"
 # --------------------------------------------
 log "Отключение IPv6..."
 
-uci -q delete network.globals.ula_prefix 2>/dev/null || true
-uci -q set network.lan.ip6assign='0' 2>/dev/null || true
-uci -q delete network.lan.ip6hint 2>/dev/null || true
-uci -q delete network.lan.ip6ifaceid 2>/dev/null || true
+set +e   # временно отключаем строгий режим
 
-uci -q set network.wan.reqaddress='none' 2>/dev/null || true
-uci -q set network.wan.reqprefix='no' 2>/dev/null || true
-uci -q delete network.wan6 2>/dev/null || true
+uci -q delete network.globals.ula_prefix
+uci -q set network.lan.ip6assign='0'
+uci -q delete network.lan.ip6hint
+uci -q delete network.lan.ip6ifaceid
+
+uci -q set network.wan.reqaddress='none'
+uci -q set network.wan.reqprefix='no'
+uci -q delete network.wan6
 
 if uci -q show dhcp.lan >/dev/null 2>&1; then
     uci -q set dhcp.lan.dhcpv6='disabled'
@@ -103,11 +105,12 @@ if uci -q show dhcp.wan >/dev/null 2>&1; then
     uci -q set dhcp.wan.ndp='disabled'
 fi
 
+# Чистим IPv6-правила firewall
 idx=0
 while uci -q show "firewall.@rule[$idx]" >/dev/null 2>&1; do
     family=$(uci -q get "firewall.@rule[$idx].family" 2>/dev/null)
     if [ "$family" = "ipv6" ]; then
-        uci -q delete "firewall.@rule[$idx]" 2>/dev/null || true
+        uci -q delete "firewall.@rule[$idx]"
         continue
     fi
     idx=$((idx + 1))
@@ -117,9 +120,11 @@ uci -q commit network
 uci -q commit dhcp
 uci -q commit firewall
 
-/etc/init.d/odhcpd disable 2>/dev/null || true
-/etc/init.d/odhcpd stop 2>/dev/null || true
-/etc/init.d/firewall restart 2>/dev/null || true
+/etc/init.d/odhcpd disable
+/etc/init.d/odhcpd stop
+/etc/init.d/firewall restart
+
+set -e   # возвращаем строгий режим
 
 log "IPv6 отключён (сеть будет перезапущена позже)"
 
