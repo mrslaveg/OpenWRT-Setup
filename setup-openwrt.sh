@@ -112,87 +112,9 @@ log "Установка SSClash..."
 wget --no-proxy -qO- https://github.com/zerolabnet/SSClash/raw/refs/heads/main/install-ssclash.sh | ash
 
 # --------------------------------------------
-# 4. DNS Override (53 → 753)
+# 4. Перезаписываем config.yaml нашим
 # --------------------------------------------
-log "Настройка DNS Override (порт 53 → 753)..."
-
-uci add firewall redirect
-uci set firewall.@redirect[-1].name='LAN DNS to Mihomo'
-uci set firewall.@redirect[-1].src='lan'
-uci set firewall.@redirect[-1].src_dport='53'
-uci set firewall.@redirect[-1].dest_port='753'
-uci set firewall.@redirect[-1].proto='tcp udp'
-uci set firewall.@redirect[-1].family='ipv4'
-uci set firewall.@redirect[-1].target='DNAT'
-uci set firewall.@redirect[-1].dest='lan'
-uci commit firewall
-/etc/init.d/firewall restart
-
-# --------------------------------------------
-# 5. Правка /etc/init.d/clash
-# --------------------------------------------
-log "Исправление DNS-порта в /etc/init.d/clash..."
-
-if [ -f /etc/init.d/clash ]; then
-    sed -i 's/127\.0\.0\.1#7874/127.0.0.1#753/g' /etc/init.d/clash
-    log "DNS-порт изменён на 753"
-else
-    warn "Файл /etc/init.d/clash не найден"
-fi
-
-# --------------------------------------------
-# 6. NTP-серверы
-# --------------------------------------------
-log "Установка NTP-серверов..."
-
-uci -q delete system.ntp.server
-uci add_list system.ntp.server='0.ru.pool.ntp.org'
-uci add_list system.ntp.server='1.ru.pool.ntp.org'
-uci add_list system.ntp.server='ntp.ix.ru'
-uci add_list system.ntp.server='ntp1.vniiftri.ru'
-uci set system.ntp.enable_server='0'
-uci commit system
-/etc/init.d/sysntpd restart
-
-# --------------------------------------------
-# 7. Проброс порта 7777 → LAN_IP:80
-# --------------------------------------------
-log "Проброс порта 7777 → $LAN_IP:80..."
-
-uci add firewall redirect
-uci set firewall.@redirect[-1].name='Remote management'
-uci set firewall.@redirect[-1].src='wan'
-uci set firewall.@redirect[-1].src_dport='7777'
-uci set firewall.@redirect[-1].dest='lan'
-uci set firewall.@redirect[-1].dest_ip="$LAN_IP"
-uci set firewall.@redirect[-1].dest_port='80'
-uci set firewall.@redirect[-1].proto='tcp'
-uci set firewall.@redirect[-1].target='DNAT'
-uci commit firewall
-/etc/init.d/firewall restart
-
-# --------------------------------------------
-# 8. Включение Wi-Fi
-# --------------------------------------------
-log "Включение Wi-Fi..."
-
-for radio in $(uci show wireless 2>/dev/null | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
-    uci set wireless.$radio.disabled='0'
-done
-
-for iface in $(uci show wireless 2>/dev/null | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
-    uci set wireless.$iface.disabled='0'
-done
-
-uci commit wireless
-wifi up 2>/dev/null || wifi reload 2>/dev/null || true
-
-log "Wi-Fi включён"
-
-# --------------------------------------------
-# 9. Конфиг SSClash + генерация hwid
-# --------------------------------------------
-log "Запись конфига SSClash..."
+log "Запись конфига SSClash (перезаписываем дефолтный)..."
 
 if [ -f /proc/sys/kernel/random/uuid ]; then
     HWID=$(cat /proc/sys/kernel/random/uuid)
@@ -204,7 +126,6 @@ log "Сгенерирован x-hwid: $HWID"
 
 mkdir -p /opt/clash
 
-# Экранируем спецсимволы в секрете
 DASH_SECRET_ESC=$(printf '%s' "$DASH_SECRET" | sed 's/[\\"]/\\&/g')
 
 cat > /opt/clash/config.yaml << EOF
@@ -397,8 +318,95 @@ EOF
 
 log "Конфиг записан в /opt/clash/config.yaml"
 
+# --------------------------------------------
+# 5. Правка /etc/init.d/clash (если появился)
+# --------------------------------------------
+log "Исправление DNS-порта в /etc/init.d/clash..."
+
 if [ -f /etc/init.d/clash ]; then
+    sed -i 's/127\.0\.0\.1#7874/127.0.0.1#753/g' /etc/init.d/clash
+    log "DNS-порт изменён на 753"
+else
+    warn "Файл /etc/init.d/clash пока не найден (будет использован порт из config.yaml)"
+fi
+
+# --------------------------------------------
+# 6. DNS Override (53 → 753)
+# --------------------------------------------
+log "Настройка DNS Override (порт 53 → 753)..."
+
+uci add firewall redirect
+uci set firewall.@redirect[-1].name='LAN DNS to Mihomo'
+uci set firewall.@redirect[-1].src='lan'
+uci set firewall.@redirect[-1].src_dport='53'
+uci set firewall.@redirect[-1].dest_port='753'
+uci set firewall.@redirect[-1].proto='tcp udp'
+uci set firewall.@redirect[-1].family='ipv4'
+uci set firewall.@redirect[-1].target='DNAT'
+uci set firewall.@redirect[-1].dest='lan'
+uci commit firewall
+/etc/init.d/firewall restart
+
+# --------------------------------------------
+# 7. NTP-серверы
+# --------------------------------------------
+log "Установка NTP-серверов..."
+
+uci -q delete system.ntp.server
+uci add_list system.ntp.server='0.ru.pool.ntp.org'
+uci add_list system.ntp.server='1.ru.pool.ntp.org'
+uci add_list system.ntp.server='ntp.ix.ru'
+uci add_list system.ntp.server='ntp1.vniiftri.ru'
+uci set system.ntp.enable_server='0'
+uci commit system
+/etc/init.d/sysntpd restart
+
+# --------------------------------------------
+# 8. Проброс порта 7777 → LAN_IP:80
+# --------------------------------------------
+log "Проброс порта 7777 → $LAN_IP:80..."
+
+uci add firewall redirect
+uci set firewall.@redirect[-1].name='Remote management'
+uci set firewall.@redirect[-1].src='wan'
+uci set firewall.@redirect[-1].src_dport='7777'
+uci set firewall.@redirect[-1].dest='lan'
+uci set firewall.@redirect[-1].dest_ip="$LAN_IP"
+uci set firewall.@redirect[-1].dest_port='80'
+uci set firewall.@redirect[-1].proto='tcp'
+uci set firewall.@redirect[-1].target='DNAT'
+uci commit firewall
+/etc/init.d/firewall restart
+
+# --------------------------------------------
+# 9. Включение Wi-Fi
+# --------------------------------------------
+log "Включение Wi-Fi..."
+
+for radio in $(uci show wireless 2>/dev/null | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.$radio.disabled='0'
+done
+
+for iface in $(uci show wireless 2>/dev/null | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.$iface.disabled='0'
+done
+
+uci commit wireless
+wifi up 2>/dev/null || wifi reload 2>/dev/null || true
+
+log "Wi-Fi включён"
+
+# --------------------------------------------
+# 10. Запуск SSClash
+# --------------------------------------------
+log "Запуск SSClash..."
+
+if [ -f /etc/init.d/clash ]; then
+    /etc/init.d/clash enable 2>/dev/null || true
     /etc/init.d/clash restart 2>/dev/null || true
+    log "SSClash запущен и добавлен в автозагрузку"
+else
+    warn "Сервис clash не найден — запусти вручную через LuCI"
 fi
 
 # --------------------------------------------
@@ -413,11 +421,12 @@ echo "Сделано:"
 echo "  • Система обновлена"
 echo "  • IPv6 отключён"
 echo "  • SSClash установлен"
+echo "  • Дефолтный config.yaml перезаписан"
 echo "  • DNS 53 → 753"
 echo "  • NTP-серверы установлены"
 echo "  • Порт 7777 → $LAN_IP:80"
 echo "  • Wi-Fi включён"
-echo "  • Конфиг SSClash записан"
+echo "  • SSClash запущен"
 echo "      Подписка : $SUB_URL"
 echo "      Секрет   : $DASH_SECRET"
 echo "      hwid     : $HWID"
@@ -432,14 +441,12 @@ read -r REBOOT_ANS
 case "$REBOOT_ANS" in
     y|Y|yes|YES|да|ДА)
         log "Перезагрузка..."
-        # Удаляем скрипт перед ребутом
         rm -f /tmp/setup-openwrt.sh 2>/dev/null || true
         sleep 1
         reboot
         ;;
     *)
         info "Перезагрузка отложена"
-        # Удаляем скрипт
         rm -f /tmp/setup-openwrt.sh 2>/dev/null || true
         log "Скрипт удалён из /tmp"
         ;;
