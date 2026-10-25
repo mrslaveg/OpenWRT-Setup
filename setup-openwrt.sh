@@ -26,17 +26,23 @@ echo "============================================"
 echo
 
 # --------------------------------------------
+# Определяем IP роутера
+# --------------------------------------------
+LAN_IP=$(uci -q get network.lan.ipaddr)
+[ -z "$LAN_IP" ] && LAN_IP="192.168.1.1"
+info "IP роутера: $LAN_IP"
+echo
+
+# --------------------------------------------
 # Интерактивный ввод
 # --------------------------------------------
 echo -e "${CYAN}Введите данные для SSClash:${NC}"
 echo
 
-# Подписка
 printf "Ссылка на подписку: "
 read -r SUB_URL
 [ -z "$SUB_URL" ] && error "Ссылка на подписку не может быть пустой"
 
-# Секрет дашборда
 printf "Секрет для дашборда (secret): "
 read -r DASH_SECRET
 [ -z "$DASH_SECRET" ] && error "Секрет не может быть пустым"
@@ -149,16 +155,16 @@ uci commit system
 /etc/init.d/sysntpd restart
 
 # --------------------------------------------
-# 7. Проброс порта 7777 → 192.168.1.1:80
+# 7. Проброс порта 7777 → LAN_IP:80
 # --------------------------------------------
-log "Проброс порта 7777 → 192.168.1.1:80..."
+log "Проброс порта 7777 → $LAN_IP:80..."
 
 uci add firewall redirect
 uci set firewall.@redirect[-1].name='Remote management'
 uci set firewall.@redirect[-1].src='wan'
 uci set firewall.@redirect[-1].src_dport='7777'
 uci set firewall.@redirect[-1].dest='lan'
-uci set firewall.@redirect[-1].dest_ip='192.168.1.1'
+uci set firewall.@redirect[-1].dest_ip="$LAN_IP"
 uci set firewall.@redirect[-1].dest_port='80'
 uci set firewall.@redirect[-1].proto='tcp'
 uci set firewall.@redirect[-1].target='DNAT'
@@ -188,7 +194,6 @@ log "Wi-Fi включён"
 # --------------------------------------------
 log "Запись конфига SSClash..."
 
-# Генерируем новый hwid
 if [ -f /proc/sys/kernel/random/uuid ]; then
     HWID=$(cat /proc/sys/kernel/random/uuid)
 else
@@ -199,7 +204,7 @@ log "Сгенерирован x-hwid: $HWID"
 
 mkdir -p /opt/clash
 
-# Экранируем спецсимволы в секрете для YAML
+# Экранируем спецсимволы в секрете
 DASH_SECRET_ESC=$(printf '%s' "$DASH_SECRET" | sed 's/[\\"]/\\&/g')
 
 cat > /opt/clash/config.yaml << EOF
@@ -396,6 +401,9 @@ if [ -f /etc/init.d/clash ]; then
     /etc/init.d/clash restart 2>/dev/null || true
 fi
 
+# --------------------------------------------
+# Финал
+# --------------------------------------------
 echo
 echo "============================================"
 log "Настройка завершена!"
@@ -407,12 +415,34 @@ echo "  • IPv6 отключён"
 echo "  • SSClash установлен"
 echo "  • DNS 53 → 753"
 echo "  • NTP-серверы установлены"
-echo "  • Порт 7777 → 192.168.1.1:80"
+echo "  • Порт 7777 → $LAN_IP:80"
 echo "  • Wi-Fi включён"
 echo "  • Конфиг SSClash записан"
 echo "      Подписка : $SUB_URL"
 echo "      Секрет   : $DASH_SECRET"
 echo "      hwid     : $HWID"
 echo
-warn "Рекомендуется перезагрузить роутер: reboot"
+info "Роутер:   http://$LAN_IP"
+info "Дашборд:  http://$LAN_IP:9090/ui"
+echo
+
+# Вопрос о перезагрузке
+printf "Перезагрузить роутер сейчас? [y/N]: "
+read -r REBOOT_ANS
+case "$REBOOT_ANS" in
+    y|Y|yes|YES|да|ДА)
+        log "Перезагрузка..."
+        # Удаляем скрипт перед ребутом
+        rm -f /tmp/setup-openwrt.sh 2>/dev/null || true
+        sleep 1
+        reboot
+        ;;
+    *)
+        info "Перезагрузка отложена"
+        # Удаляем скрипт
+        rm -f /tmp/setup-openwrt.sh 2>/dev/null || true
+        log "Скрипт удалён из /tmp"
+        ;;
+esac
+
 echo
