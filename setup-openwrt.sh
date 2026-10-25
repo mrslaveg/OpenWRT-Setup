@@ -2,7 +2,7 @@
 
 # ============================================
 #  Автоматическая настройка OpenWrt
-#  SSClash + DNS Override + IPv6 off + NTP + WiFi
+#  SSClash + DNS Override + IPv6 off + NTP + WiFi + RU
 # ============================================
 
 set -e
@@ -26,9 +26,9 @@ echo "============================================"
 echo
 
 # --------------------------------------------
-# Определяем IP роутера
+# Определяем IP роутера (без маски)
 # --------------------------------------------
-LAN_IP=$(uci -q get network.lan.ipaddr)
+LAN_IP=$(uci -q get network.lan.ipaddr | cut -d'/' -f1)
 [ -z "$LAN_IP" ] && LAN_IP="192.168.1.1"
 info "IP роутера: $LAN_IP"
 echo
@@ -36,7 +36,7 @@ echo
 # --------------------------------------------
 # Интерактивный ввод
 # --------------------------------------------
-echo -e "${CYAN}Введите данные для SSClash:${NC}"
+echo -e "${CYAN}Введите данные:${NC}"
 echo
 
 printf "Ссылка на подписку: "
@@ -47,72 +47,90 @@ printf "Секрет для дашборда (secret): "
 read -r DASH_SECRET
 [ -z "$DASH_SECRET" ] && error "Секрет не может быть пустым"
 
+printf "Пароль администратора (root/LuCI): "
+read -r ROOT_PASS
+[ -z "$ROOT_PASS" ] && error "Пароль не может быть пустым"
+
 echo
-log "Подписка: $SUB_URL"
-log "Секрет:   $DASH_SECRET"
+log "Подписка : $SUB_URL"
+log "Секрет   : $DASH_SECRET"
+log "Пароль   : ********"
 echo
 
 # --------------------------------------------
-# 1. Обновление системы
+# 1. Обновление системы + русский язык
 # --------------------------------------------
 log "Обновление пакетов..."
 apk update
 apk upgrade
 
+log "Установка русского языка..."
+apk add luci-i18n-base-ru 2>/dev/null || warn "Не удалось установить luci-i18n-base-ru"
+uci set luci.main.lang='ru'
+uci commit luci
+log "Язык интерфейса: русский"
+
 # --------------------------------------------
-# 2. Отключение IPv6
+# 2. Установка пароля root
+# --------------------------------------------
+log "Установка пароля администратора..."
+echo "root:$ROOT_PASS" | chpasswd
+log "Пароль root установлен"
+
+# --------------------------------------------
+# 3. Отключение IPv6 (без network restart)
 # --------------------------------------------
 log "Отключение IPv6..."
 
-uci -q delete network.globals.ula_prefix
-uci set network.lan.ip6assign='0'
-uci -q delete network.lan.ip6hint
-uci -q delete network.lan.ip6ifaceid
-uci set network.wan.reqaddress='none'
-uci set network.wan.reqprefix='no'
-uci -q delete network.wan6
+uci -q delete network.globals.ula_prefix 2>/dev/null || true
+uci -q set network.lan.ip6assign='0' 2>/dev/null || true
+uci -q delete network.lan.ip6hint 2>/dev/null || true
+uci -q delete network.lan.ip6ifaceid 2>/dev/null || true
+
+uci -q set network.wan.reqaddress='none' 2>/dev/null || true
+uci -q set network.wan.reqprefix='no' 2>/dev/null || true
+uci -q delete network.wan6 2>/dev/null || true
 
 if uci -q show dhcp.lan >/dev/null 2>&1; then
-    uci set dhcp.lan.dhcpv6='disabled'
-    uci set dhcp.lan.ra='disabled'
-    uci set dhcp.lan.ndp='disabled'
+    uci -q set dhcp.lan.dhcpv6='disabled'
+    uci -q set dhcp.lan.ra='disabled'
+    uci -q set dhcp.lan.ndp='disabled'
 fi
 
 if uci -q show dhcp.wan >/dev/null 2>&1; then
-    uci set dhcp.wan.dhcpv6='disabled'
-    uci set dhcp.wan.ra='disabled'
-    uci set dhcp.wan.ndp='disabled'
+    uci -q set dhcp.wan.dhcpv6='disabled'
+    uci -q set dhcp.wan.ra='disabled'
+    uci -q set dhcp.wan.ndp='disabled'
 fi
 
 idx=0
 while uci -q show "firewall.@rule[$idx]" >/dev/null 2>&1; do
     family=$(uci -q get "firewall.@rule[$idx].family" 2>/dev/null)
     if [ "$family" = "ipv6" ]; then
-        uci delete "firewall.@rule[$idx]"
+        uci -q delete "firewall.@rule[$idx]" 2>/dev/null || true
         continue
     fi
     idx=$((idx + 1))
 done
 
-uci commit network
-uci commit dhcp
-uci commit firewall
+uci -q commit network
+uci -q commit dhcp
+uci -q commit firewall
 
 /etc/init.d/odhcpd disable 2>/dev/null || true
 /etc/init.d/odhcpd stop 2>/dev/null || true
-/etc/init.d/network restart
-/etc/init.d/firewall restart
+/etc/init.d/firewall restart 2>/dev/null || true
 
-log "IPv6 отключён"
+log "IPv6 отключён (сеть будет перезапущена позже)"
 
 # --------------------------------------------
-# 3. Установка SSClash
+# 4. Установка SSClash
 # --------------------------------------------
 log "Установка SSClash..."
 wget --no-proxy -qO- https://github.com/zerolabnet/SSClash/raw/refs/heads/main/install-ssclash.sh | ash
 
 # --------------------------------------------
-# 4. Перезаписываем config.yaml нашим
+# 5. Перезаписываем config.yaml
 # --------------------------------------------
 log "Запись конфига SSClash (перезаписываем дефолтный)..."
 
@@ -319,7 +337,7 @@ EOF
 log "Конфиг записан в /opt/clash/config.yaml"
 
 # --------------------------------------------
-# 5. Правка /etc/init.d/clash (если появился)
+# 6. Правка /etc/init.d/clash (если есть)
 # --------------------------------------------
 log "Исправление DNS-порта в /etc/init.d/clash..."
 
@@ -327,11 +345,11 @@ if [ -f /etc/init.d/clash ]; then
     sed -i 's/127\.0\.0\.1#7874/127.0.0.1#753/g' /etc/init.d/clash
     log "DNS-порт изменён на 753"
 else
-    warn "Файл /etc/init.d/clash пока не найден (будет использован порт из config.yaml)"
+    warn "Файл /etc/init.d/clash не найден (будет использован порт из config.yaml)"
 fi
 
 # --------------------------------------------
-# 6. DNS Override (53 → 753)
+# 7. DNS Override (53 → 753)
 # --------------------------------------------
 log "Настройка DNS Override (порт 53 → 753)..."
 
@@ -348,7 +366,7 @@ uci commit firewall
 /etc/init.d/firewall restart
 
 # --------------------------------------------
-# 7. NTP-серверы
+# 8. NTP-серверы
 # --------------------------------------------
 log "Установка NTP-серверов..."
 
@@ -362,7 +380,7 @@ uci commit system
 /etc/init.d/sysntpd restart
 
 # --------------------------------------------
-# 8. Проброс порта 7777 → LAN_IP:80
+# 9. Проброс порта 7777 → LAN_IP:80
 # --------------------------------------------
 log "Проброс порта 7777 → $LAN_IP:80..."
 
@@ -379,7 +397,7 @@ uci commit firewall
 /etc/init.d/firewall restart
 
 # --------------------------------------------
-# 9. Включение Wi-Fi
+# 10. Включение Wi-Fi
 # --------------------------------------------
 log "Включение Wi-Fi..."
 
@@ -397,10 +415,12 @@ wifi up 2>/dev/null || wifi reload 2>/dev/null || true
 log "Wi-Fi включён"
 
 # --------------------------------------------
-# 10. Запуск SSClash
+# 11. Применение сети + запуск SSClash
 # --------------------------------------------
-log "Запуск SSClash..."
+log "Применение сетевых изменений..."
+/etc/init.d/network reload 2>/dev/null || /etc/init.d/network restart 2>/dev/null || true
 
+log "Запуск SSClash..."
 if [ -f /etc/init.d/clash ]; then
     /etc/init.d/clash enable 2>/dev/null || true
     /etc/init.d/clash restart 2>/dev/null || true
@@ -419,6 +439,8 @@ echo "============================================"
 echo
 echo "Сделано:"
 echo "  • Система обновлена"
+echo "  • Русский язык установлен"
+echo "  • Пароль администратора установлен"
 echo "  • IPv6 отключён"
 echo "  • SSClash установлен"
 echo "  • Дефолтный config.yaml перезаписан"
