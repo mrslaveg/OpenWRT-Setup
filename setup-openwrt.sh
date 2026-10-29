@@ -202,51 +202,57 @@ dns:
   listen: 0.0.0.0:753
   ipv6: false
   cache-algorithm: arc
+
   default-nameserver:
     - 77.88.8.8
     - 8.8.8.8
+
   nameserver:
     - https://cloudflare-dns.com/dns-query#VPN
     - https://dns.google/dns-query#VPN
+
   nameserver-policy:
     'rule-set:geosite-ru':
       - https://common.dot.dns.yandex.net/dns-query
-    'rule-set:direct':
-      - https://common.dot.dns.yandex.net/dns-query
-    'rule-set:games':
+    'rule-set:direct-domains':
       - https://common.dot.dns.yandex.net/dns-query
     '+.ru,+.su,+.xn--p1ai,+.moscow,+.xn--80adxhks,+.tatar':
       - https://common.dot.dns.yandex.net/dns-query
+
 # --- ПРОВАЙДЕРЫ ПРАВИЛ ---
 rule-providers:
-  direct:
+  direct-domains:
     type: http
     behavior: domain
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/direct.mrs"
-    path: ./rules/direct.mrs
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/direct-domains.mrs"
+    path: ./rules/direct-domains.mrs
     interval: 3600
-  games:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/games.mrs"
-    path: ./rules/games.mrs
-    interval: 3600
-  games-ip:
+
+  direct-ip:
     type: http
     behavior: ipcidr
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/gamesip.mrs"
-    path: ./rules/games-ip.mrs
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/direct-ip.mrs"
+    path: ./rules/direct-ip.mrs
     interval: 3600
-  proxy:
+
+  proxy-domains:
     type: http
     behavior: domain
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/proxy.mrs"
-    path: ./rules/proxy.mrs
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/proxy-domains.mrs"
+    path: ./rules/proxy-domains.mrs
     interval: 3600
+
+  proxy-ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/proxy-ip.mrs"
+    path: ./rules/proxy-ip.mrs
+    interval: 3600
+
   geosite-ru:
     type: http
     behavior: domain
@@ -254,6 +260,7 @@ rule-providers:
     url: "https://raw.githubusercontent.com/Davoyan/mihomo-rule-sets/main/rules/category-ru.mrs"
     path: ./rules/geosite-ru.mrs
     interval: 86400
+
   geoip-ru:
     type: http
     behavior: ipcidr
@@ -261,6 +268,7 @@ rule-providers:
     url: "https://raw.githubusercontent.com/Davoyan/mihomo-rule-sets/main/ip-for-ru/lists/ips-for-ru.mrs"
     path: ./rules/geoip-ru.mrs
     interval: 86400
+
 # --- ПРОВАЙДЕРЫ ПРОКСИ ---
 proxy-providers:
   FastConnect:
@@ -321,21 +329,34 @@ proxy-groups:
       - DIRECT
 # --- ПРАВИЛА МАРШРУТИЗАЦИИ ---
 rules:
+  # 1. Локальные / приватные сети
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
   - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
-  - RULE-SET,direct,DIRECT
+
+  # 2. Эти сервисы принудительно в Direct
+  - RULE-SET,direct-domains,DIRECT
+  - RULE-SET,direct-ip,DIRECT,no-resolve
+
+  # 3. Россия — домены и IP
   - RULE-SET,geosite-ru,DIRECT
   - RULE-SET,geoip-ru,DIRECT,no-resolve
-  - RULE-SET,games,DIRECT
-  - RULE-SET,games-ip,DIRECT,no-resolve
+
+  # 4. UDP/443 (QUIC) режем
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT-DROP
-  - RULE-SET,proxy,VPN
+
+  # 5. Эти сервисы принудительно через VPN
+  - RULE-SET,proxy-domains,VPN
+  - RULE-SET,proxy-ip,VPN,no-resolve
+
+  # 6. Торрент-порты
   - DST-PORT,6881-6889,DIRECT
   - DST-PORT,51413,DIRECT
+
+  # 7. Всё остальное — VPN
   - MATCH,VPN
 EOF
 
