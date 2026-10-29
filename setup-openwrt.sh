@@ -155,6 +155,7 @@ cat > /opt/clash/config.yaml << EOF
 mixed-port: 7892
 redir-port: 7893
 tproxy-port: 7894
+
 # --- ОБЩИЕ НАСТРОЙКИ ЯДРА ---
 allow-lan: true
 mode: rule
@@ -167,8 +168,10 @@ external-controller: 0.0.0.0:9090
 secret: "${DASH_SECRET_ESC}"
 external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
 global-ua: clash.meta
+
 profile:
   store-selected: true
+
 # --- НАСТРОЙКИ СНИФФЕРА ---
 sniffer:
   enable: true
@@ -196,6 +199,7 @@ sniffer:
     - "+.telesco.pe"
     - "+.tg.dev"
     - "+.tx.me"
+
 # --- DNS ---
 dns:
   enable: true
@@ -292,13 +296,19 @@ proxy-providers:
       User-Agent:
         - "mihomo/1.19 (OpenWrt; like Clash Meta)"
 proxies: []
+
 proxy-groups:
+  # Основная группа для обычной работы
   - name: VPN
     type: select
     proxies:
       - PROXY AUTO
       - PROXY MANUAL
       - DIRECT
+
+  # Автоматический режим:
+  # сначала пытаемся работать через PROXY BEST,
+  # если весь пул FastConnect недоступен — DIRECT
   - name: PROXY AUTO
     type: fallback
     proxies:
@@ -307,6 +317,9 @@ proxy-groups:
     url: https://cp.cloudflare.com
     interval: 60
     lazy: false
+
+  # Автоматически выбирает наиболее быстрый доступный
+  # FastConnect-сервер
   - name: PROXY BEST
     type: url-test
     use:
@@ -315,10 +328,14 @@ proxy-groups:
     interval: 60
     tolerance: 50
     lazy: false
+
+  # Ручной выбор конкретной FastConnect-ноды
   - name: PROXY MANUAL
     type: select
     use:
       - FastConnect
+
+  # Скрытая группа для использования в правилах
   - name: GLOBAL
     type: select
     hidden: true
@@ -327,6 +344,7 @@ proxy-groups:
       - PROXY MANUAL
       - PROXY BEST
       - DIRECT
+
 # --- ПРАВИЛА МАРШРУТИЗАЦИИ ---
 rules:
   # 1. Локальные / приватные сети
@@ -358,6 +376,7 @@ rules:
 
   # 7. Всё остальное — VPN
   - MATCH,VPN
+
 EOF
 
 log "Конфиг записан в /opt/clash/config.yaml"
