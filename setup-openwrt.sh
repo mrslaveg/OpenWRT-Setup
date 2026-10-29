@@ -229,7 +229,7 @@ rule-providers:
     type: http
     behavior: domain
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/direct-domains.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/direct-domains.mrs"
     path: ./rules/direct-domains.mrs
     interval: 3600
 
@@ -237,7 +237,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/direct-ip.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/direct-ip.mrs"
     path: ./rules/direct-ip.mrs
     interval: 3600
 
@@ -245,7 +245,7 @@ rule-providers:
     type: http
     behavior: domain
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/proxy-domains.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/proxy-domains.mrs"
     path: ./rules/proxy-domains.mrs
     interval: 3600
 
@@ -253,7 +253,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/proxy-ip.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/proxy-ip.mrs"
     path: ./rules/proxy-ip.mrs
     interval: 3600
 
@@ -261,7 +261,7 @@ rule-providers:
     type: http
     behavior: domain
     format: mrs
-    url: "https://raw.githubusercontent.com/Davoyan/mihomo-rule-sets/main/rules/category-ru.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/geosite-ru.mrs"
     path: ./rules/geosite-ru.mrs
     interval: 86400
 
@@ -269,7 +269,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: "https://raw.githubusercontent.com/Davoyan/mihomo-rule-sets/main/ip-for-ru/lists/ips-for-ru.mrs"
+    url: "https://raw.githubusercontent.com/mrslaveg/mihomo-rule-sets/main/rules/geoip-ru.mrs"
     path: ./rules/geoip-ru.mrs
     interval: 86400
 
