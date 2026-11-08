@@ -208,16 +208,25 @@ dns:
   enable: true
   listen: 0.0.0.0:753
   ipv6: false
+  enhanced-mode: redir-host
   cache-algorithm: arc
 
   default-nameserver:
     - 77.88.8.8
     - 8.8.8.8
 
+  proxy-server-nameserver:
+    - 77.88.8.8
+    - 8.8.8.8
+
+  direct-nameserver:
+    - https://common.dot.dns.yandex.net/dns-query
+
   nameserver:
     - https://cloudflare-dns.com/dns-query#VPN
     - https://dns.google/dns-query#VPN
 
+  direct-nameserver-follow-policy: true
   nameserver-policy:
     'rule-set:geosite-ru':
       - https://common.dot.dns.yandex.net/dns-query
