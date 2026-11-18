@@ -437,9 +437,11 @@ uci add_list system.ntp.server='0.ru.pool.ntp.org'
 uci add_list system.ntp.server='1.ru.pool.ntp.org'
 uci add_list system.ntp.server='ntp.ix.ru'
 uci add_list system.ntp.server='ntp1.vniiftri.ru'
+uci set system.ntp.enabled='1'
 uci set system.ntp.enable_server='0'
+uci set system.ntp.use_dhcp='0'
 uci commit system
-/etc/init.d/sysntpd restart
+/etc/init.d/sysntpd enable
 
 # --------------------------------------------
 # 9. Проброс порта 7777 → LAN_IP:80
@@ -481,6 +483,9 @@ log "Wi-Fi включён"
 # --------------------------------------------
 log "Применение сетевых изменений..."
 /etc/init.d/network reload 2>/dev/null || /etc/init.d/network restart 2>/dev/null || true
+
+log "Запуск NTP после настройки сети..."
+/etc/init.d/sysntpd restart
 
 log "Запуск SSClash..."
 if [ -f /etc/init.d/clash ]; then
