@@ -368,6 +368,7 @@ rules:
   - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
 
   # 2. Эти сервисы принудительно в Direct
+  - AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT
   - RULE-SET,direct-domains,DIRECT
   - RULE-SET,direct-ip,DIRECT,no-resolve
 
@@ -428,6 +429,10 @@ uci commit firewall
 log "Установка NTP-серверов..."
 
 uci -q delete system.ntp.server
+uci add_list system.ntp.server='194.190.168.1'
+uci add_list system.ntp.server='89.109.251.21'
+uci add_list system.ntp.server='89.109.251.22'
+uci add_list system.ntp.server='80.242.83.227'
 uci add_list system.ntp.server='0.ru.pool.ntp.org'
 uci add_list system.ntp.server='1.ru.pool.ntp.org'
 uci add_list system.ntp.server='ntp.ix.ru'
