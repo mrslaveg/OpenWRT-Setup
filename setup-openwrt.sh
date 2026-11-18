@@ -202,6 +202,11 @@ sniffer:
     - "+.telesco.pe"
     - "+.tg.dev"
     - "+.tx.me"
+    - "+.telegram-cdn.org"
+    - "+.cdn-telegram.org"
+    - "+.cdn-telegram.net"
+    - "+.telegram.space"
+    - "+.graph.org"
 
 # --- DNS ---
 dns:
